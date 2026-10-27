@@ -7,7 +7,7 @@
 ## 在线试玩
 
 > 开启 GitHub Pages 后，试玩地址为：
-> `https://<你的用户名>.github.io/pixel-hearth/`
+> `https://<你的用户名>.github.io/pixel-card-battle/`
 
 ## 玩法说明
 
@@ -46,7 +46,7 @@ python -m http.server 8000
 ## 文件结构
 
 ```
-pixel-hearth/
+pixel-card-battle/
 ├── index.html    # 游戏本体（HTML + CSS + JS 全部内联，单文件）
 ├── README.md     # 本文件
 └── .gitignore
