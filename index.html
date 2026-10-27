@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta content="width=device-width,initial-scale=1" name="viewport">
+<title>像素卡牌对决 · Pixel Hearth</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+--gold:#d8b968;--gold2:#8a6a2f;--gold3:#f3e0a3;
+--txt:#f3ecd8;--dim:#a9a08a;--ink:#1a1206;
+--disp:Georgia,"Palatino Linotype","Songti SC","Microsoft YaHei",serif;
+--mono:"Courier New",Consolas,monospace;
+}
+body{color:var(--txt);font-family:var(--mono);font-weight:700;min-height:100vh;
+display:flex;justify-content:center;padding:10px;user-select:none;
+background-color:#0d0f14;
+background-image:radial-gradient(ellipse at 50% 0%,#39404f 0%,#1b1f27 45%,#0d0f14 100%)}
+#app{width:1000px;max-width:100%;display:flex;flex-direction:column;gap:8px}
+/* ============ 顶栏 ============ */
+#topbar{display:flex;justify-content:space-between;align-items:center;padding:0 4px}
+#logo{font-family:var(--disp);font-size:24px;letter-spacing:3px;color:var(--gold3);
+text-shadow:0 2px 0 #000,0 3px 10px rgba(216,185,104,.45)}
+#logo .sub{font-family:var(--mono);font-size:10px;letter-spacing:4px;color:var(--gold2);
+vertical-align:middle;margin-left:8px}
+.mini{font:inherit;font-size:11px;letter-spacing:1px;padding:6px 12px;color:var(--ink);
+background:linear-gradient(#f3e0a3,#c9a44c);border:2px solid #5a4517;cursor:pointer;
+box-shadow:0 2px 0 #2a1f10,inset 0 0 0 1px #fff6d0}
+.mini:hover{background:linear-gradient(#fff8dc,#e0bb63)}
+/* ============ 桌面 ============ */
+#table{display:flex;gap:10px;align-items:flex-start}
+#boardCol{position:relative;flex:0 0 700px;width:700px;height:496px}
+#cv{display:block;width:700px;height:400px;image-rendering:pixelated;
+border-radius:6px;box-shadow:inset 0 0 0 2px var(--gold2),inset 0 0 0 4px #6b5220,
+0 0 0 3px #0a0704,0 12px 26px rgba(0,0,0,.65)}
+/* 敌方手牌（牌背） */
+#foeHand{position:absolute;top:-6px;left:0;width:700px;height:92px;
+display:flex;justify-content:center;align-items:flex-start;gap:5px;pointer-events:none;z-index:6}
+#foeHand .back{width:60px;height:84px;border-radius:6px;border:2px solid var(--gold2);
+background-image:radial-gradient(ellipse at 50% 40%,rgba(216,185,104,.35),transparent 62%),
+repeating-linear-gradient(45deg,#2f3a58 0 7px,#232c44 7px 14px);
+box-shadow:0 0 0 2px #0a0704,0 4px 8px rgba(0,0,0,.6)}
+/* 我方手牌 */
+#myHand{position:absolute;bottom:0;left:0;width:700px;height:158px;
+display:flex;justify-content:center;align-items:flex-end;gap:10px;z-index:8}
+/* 结束回合按钮 */
+.endbtn{position:absolute;right:6px;top:150px;width:96px;height:96px;border-radius:50%;
+font-family:var(--disp);font-size:16px;line-height:1.2;letter-spacing:1px;color:#fff8dc;
+background:radial-gradient(circle at 50% 32%,#7fe07a,#2f7a35 62%,#173f1c);
+border:3px solid var(--gold);cursor:pointer;z-index:9;
+box-shadow:0 0 0 3px #0a0704,0 6px 0 #14330f,inset 0 0 12px rgba(255,255,255,.25),
+0 0 22px rgba(90,200,90,.35);text-shadow:0 2px 0 #0d2c10}
+.endbtn:hover{background:radial-gradient(circle at 50% 32%,#a4ff9a,#3d9a45 62%,#1d4f22)}
+.endbtn:active{transform:translateY(3px);box-shadow:0 0 0 3px #0a0704,0 3px 0 #14330f}
+.endbtn.dis{background:radial-gradient(circle at 50% 32%,#6b7280,#3a4048 62%,#22262c);
+color:#b9b3a4;cursor:default;text-shadow:0 2px 0 #000;
+box-shadow:0 0 0 3px #0a0704,0 6px 0 #14171c,inset 0 0 14px rgba(0,0,0,.45)}
+/* 回合提示 */
+#toast{position:absolute;left:0;top:206px;width:700px;text-align:center;z-index:12;
+pointer-events:none;font-family:var(--disp);font-size:30px;letter-spacing:6px;
+color:var(--gold3);text-shadow:0 3px 0 #000,0 0 18px rgba(216,185,104,.85);opacity:0}
+#toast.on{animation:toastAnim 1.5s ease-out}
+@keyframes toastAnim{0%{opacity:0;transform:scale(.72)}18%{opacity:1;transform:scale(1)}
+72%{opacity:1}100%{opacity:0;transform:scale(1.06)}}
+/* ============ 战斗记录（覆盖式 · 固定行数，新的顶掉旧的） ============ */
+#logPanel{flex:1;height:496px;display:flex;flex-direction:column;
+background-image:linear-gradient(#242a36,#151a23);border-radius:6px;
+box-shadow:inset 0 0 0 2px var(--gold2),0 0 0 3px #0a0704,0 12px 26px rgba(0,0,0,.6);
+overflow:hidden}
+.loghead{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;
+background-image:linear-gradient(#3a3020,#241c10);border-bottom:2px solid #0a0704;
+font-family:var(--disp);font-size:13px;letter-spacing:2px;color:var(--gold3)}
+.loghead span:last-child{font-family:var(--mono);font-size:10px;color:var(--dim)}
+#log{flex:1;overflow:hidden;padding:8px 10px;font-size:12.5px;line-height:20px}
+#log .ln{height:20px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+padding-left:13px;position:relative;opacity:.94}
+#log .ln::before{content:"\25B8";position:absolute;left:0;color:#6b6350}
+#log .ln.new{animation:newline .6s ease-out}
+@keyframes newline{0%{background:rgba(216,185,104,.5);opacity:1}100%{background:transparent}}
+.l-p1{color:#8fd6ff}.l-p2{color:#ffb3d1}.l-sys{color:#d8b968}.l-good{color:#7fe08a}
+.l-bad{color:#ff8a80}.l-poi{color:#9bee77}
+/* ============ 手牌（炉石风格卡牌） ============ */
+.card{width:140px;height:152px;border-radius:9px;cursor:pointer;position:relative;
+background-image:linear-gradient(#39445c,#232a3a);border:3px solid var(--gold2);
+box-shadow:0 0 0 2px #0a0704,0 6px 0 rgba(0,0,0,.45),inset 0 0 0 1px #6b5220;
+display:flex;flex-direction:column;align-items:center;padding:4px 4px 8px;
+transition:transform .12s ease,box-shadow .12s ease}
+.card:hover{transform:translateY(-24px) scale(1.1);z-index:30;
+box-shadow:0 0 0 2px #0a0704,0 12px 22px rgba(0,0,0,.6),0 0 24px rgba(216,185,104,.8)}
+.card.dis{opacity:.5;cursor:default}
+.card.dis:hover{transform:none;box-shadow:0 0 0 2px #0a0704,0 6px 0 rgba(0,0,0,.45),inset 0 0 0 1px #6b5220}
+.card .art{width:100%;height:58px;border-radius:5px;border:2px solid #0a0704;
+background-image:radial-gradient(ellipse at 50% 130%,#44557a,#1b2130 72%);
+display:flex;align-items:center;justify-content:center;overflow:hidden}
+.card .art canvas{image-rendering:pixelated}
+.card .nm{font-family:var(--disp);font-size:12.5px;letter-spacing:1px;color:var(--gold3);
+margin-top:4px;text-shadow:0 1px 0 #000;white-space:nowrap}
+.card .tp{font-size:9px;color:var(--dim);letter-spacing:1px;margin-top:1px}
+.card .ds{flex:1;width:100%;margin-top:3px;border-radius:5px;border:2px solid #0a0704;
+background-image:linear-gradient(#1d2331,#141924);font-size:10px;line-height:1.32;
+color:#cfc9b6;text-align:center;padding:2px 3px;overflow:hidden;font-family:var(--disp);
+display:flex;align-items:center;justify-content:center}
+.gem{position:absolute;bottom:-2px;width:25px;height:25px;border-radius:50%;
+border:2px solid var(--gold);box-shadow:0 0 0 2px #0a0704;display:flex;
+align-items:center;justify-content:center;font-size:13px;color:#fff;
+font-family:var(--disp);text-shadow:0 1px 2px #000}
+.gem.l{left:-5px}.gem.r{right:-5px}
+.gem.atk{background-image:radial-gradient(circle at 40% 32%,#ff9a86,#c0392b 70%)}
+.gem.sh{background-image:radial-gradient(circle at 40% 32%,#9fd8ff,#2c6ea8 70%)}
+.gem.hp{background-image:radial-gradient(circle at 40% 32%,#a8f0a0,#2f8b39 70%)}
+.gem.dr{background-image:radial-gradient(circle at 40% 32%,#e6c8ff,#7a3fb0 70%)}
+/* ============ 弹层 ============ */
+.overlay{position:fixed;inset:0;background:rgba(5,6,10,.86);display:flex;align-items:center;
+justify-content:center;z-index:60;padding:14px}
+.overlay.hidden{display:none}
+.panel{width:560px;max-width:100%;max-height:93vh;overflow:auto;padding:20px 22px 22px;
+background-image:linear-gradient(#2b323f,#1a1e27);border-radius:8px;
+box-shadow:inset 0 0 0 2px var(--gold2),inset 0 0 40px rgba(0,0,0,.6),
+0 0 0 4px #0a0704,0 18px 40px rgba(0,0,0,.7)}
+.panel.wide{width:780px;display:flex;flex-direction:column;max-height:92vh}
+#introBody{flex:1;overflow-y:auto;overflow-x:hidden;padding-right:6px}
+.panel.wide .btnrow{flex:0 0 auto}
+.panel h2{font-family:var(--disp);font-size:22px;letter-spacing:4px;color:var(--gold3);
+text-align:center;text-shadow:0 2px 0 #000,0 0 16px rgba(216,185,104,.5);margin-bottom:6px}
+.panel .lead{text-align:center;font-size:11px;color:var(--dim);letter-spacing:2px;margin-bottom:14px}
+.btn{display:block;width:100%;font-family:var(--disp);font-size:16px;letter-spacing:3px;
+padding:12px;margin-top:10px;color:var(--ink);cursor:pointer;border-radius:6px;
+background-image:linear-gradient(#ffe9a8,#cfa044);border:3px solid #5a4517;
+box-shadow:0 4px 0 #2a1f10,inset 0 0 0 1px #fff8d8}
+.btn:hover{background-image:linear-gradient(#fff6cf,#e0b656)}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #2a1f10}
+.btn.green{background-image:linear-gradient(#a8f0a0,#3d9a45);color:#f6fff2;border-color:#1d4f22;
+text-shadow:0 2px 0 #14401a}
+.btn.green:hover{background-image:linear-gradient(#c8ffc0,#52b85c)}
+.btn.blue{background-image:linear-gradient(#b6e2ff,#3f8fd0);color:#08131c;border-color:#1d4d70}
+.btn.gray{background-image:linear-gradient(#8b8577,#4c4740);color:#efeadd;border-color:#2a2620;
+text-shadow:0 2px 0 #201d18}
+.btn.gray:hover{background-image:linear-gradient(#a29c8c,#5d574d)}
+.btnrow{display:flex;gap:10px}
+/* 介绍面板 */
+.sect{margin-top:14px}
+.sect h3{font-family:var(--disp);font-size:14px;letter-spacing:2px;color:var(--gold3);
+border-bottom:2px solid #3d3423;padding-bottom:5px;margin-bottom:9px}
+.rules{font-size:12px;line-height:1.85;color:#dad3bf;background:rgba(0,0,0,.28);
+border:2px solid #0a0704;border-radius:5px;padding:9px 12px}
+.rules b{color:var(--gold3)}
+.crow{display:flex;gap:9px;align-items:center;padding:6px 4px;border-bottom:1px dashed #3a3428}
+.crow canvas{image-rendering:pixelated;flex:0 0 auto}
+.crow .ci{flex:1;min-width:0}
+.crow .cn2{font-family:var(--disp);font-size:12.5px;color:var(--gold3)}
+.crow .cd2{font-size:10.5px;color:#bdb6a4;line-height:1.45;margin-top:2px;font-family:var(--disp)}
+.ctag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;
+background:#0a0704;border:1px solid #4a4230;margin-left:6px;color:var(--dim)}
+.prob{flex:0 0 112px;text-align:right}
+.prob .pv{font-size:12px;color:var(--gold3)}
+.prob .pb{height:7px;background:#0a0704;border:1px solid #4a4230;margin-top:4px;
+border-radius:3px;overflow:hidden}
+.prob .pb i{display:block;height:100%;background-image:linear-gradient(90deg,#c9a44c,#ffe9a8)}
+/* 详情弹窗（大卡） */
+.mcard{display:flex;gap:18px;align-items:flex-start}
+.big{flex:0 0 196px;height:256px;border-radius:10px;border:3px solid var(--gold2);
+background-image:linear-gradient(#39445c,#232a3a);
+box-shadow:0 0 0 2px #0a0704,inset 0 0 0 1px #6b5220;
+display:flex;flex-direction:column;align-items:center;padding:8px;position:relative}
+.big .art{width:100%;height:112px;border-radius:6px;border:2px solid #0a0704;
+background-image:radial-gradient(ellipse at 50% 130%,#44557a,#1b2130 72%);
+display:flex;align-items:center;justify-content:center}
+.big .art canvas{image-rendering:pixelated}
+.big .nm{font-family:var(--disp);font-size:19px;color:var(--gold3);margin-top:9px;
+text-shadow:0 2px 0 #000;letter-spacing:2px}
+.big .nm2{font-family:var(--disp);font-size:10px;color:var(--gold2);letter-spacing:3px;margin-top:2px}
+.big .ds{flex:1;width:100%;margin-top:8px;border-radius:6px;border:2px solid #0a0704;
+background-image:linear-gradient(#1d2331,#141924);font-family:var(--disp);font-size:11px;
+line-height:1.5;color:#d4cebb;padding:6px 8px;text-align:center}
+.mright{flex:1;min-width:0}
+.mtype{display:inline-block;font-family:var(--disp);font-size:12px;padding:3px 10px;
+background:#0a0704;border:2px solid #4a4230;border-radius:4px;margin-bottom:10px}
+.mdesc{font-size:13px;line-height:1.8;color:#e6e0cc;font-family:var(--disp)}
+.mdesc .k{color:var(--gold3)}
+.pop{animation:pop .2s ease-out}
+@keyframes pop{0%{transform:scale(.82);opacity:.4}100%{transform:scale(1);opacity:1}}
+#over .winbig{font-family:var(--disp);font-size:34px;text-align:center;color:var(--gold3);
+text-shadow:0 3px 0 #000,0 0 26px rgba(216,185,104,.8);margin:6px 0 14px}
+/* 屏幕较窄时保持桌面固定尺寸，横向滚动，避免棋盘与手牌错位 */
+@media (max-width:1040px){
+ body{justify-content:flex-start;overflow-x:auto}
+ #app{width:1000px;flex:0 0 1000px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+  </header>
+
+  <div id="table">
+    <div id="boardCol">
+      <canvas height="400" id="cv" width="700"></canvas>
+      <div id="foeHand"></div>
+      <div id="toast"></div>
+      <div id="myHand"></div>
+    </div>
+    <aside id="logPanel">
+      <div id="log"></div>
+    </aside>
+  </div>
+</div>
+
+<div class="overlay" id="start">
+  <div class="panel">
+  </div>
+</div>
+
+<div class="overlay hidden" id="intro">
+  <div class="panel wide pop">
+    <div id="introBody"></div>
+    <div class="btnrow" style="margin-top:16px">
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="modal">
+  <div class="panel pop">
+    <div class="mcard">
+      <div class="big" id="mBig"></div>
+      <div class="mright">
+        <div class="mtype" id="mType"></div>
+        <div class="mdesc" id="mDesc"></div>
+      </div>
+    </div>
+    <div class="btnrow">
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="over">
+  <div class="panel pop" style="text-align:center">
+    <div class="winbig" id="overTxt"></div>
+    <div class="rules" id="overSub" style="text-align:left"></div>
+    <div class="btnrow" style="margin-top:12px">
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ==================== 卡牌数据 ====================
+   gemL / gemR：卡牌两个下角的数值宝石（攻击 / 护盾 / 治疗 / 毒）
+   ================================================= */
+const MAXHP = 30, HAND_MAX = 4, POISON_TURNS = 3, POISON_DMG = 2;
+const CARDS = {
+  atk:    {no:'①', name:'攻击',     type:'攻击', color:'#e0453f', icon:'sword',  gemL:{k:'atk',v:6},
+           tip:'造成 6 点伤害', short:'伤害 6',
+           desc:'对敌方造成 6 点伤害，可被护盾抵挡。'},
+  def:    {no:'②', name:'防御',     type:'防御', color:'#3f8fd0', icon:'shield', gemL:{k:'sh',v:5},
+           tip:'抵挡 5 点伤害', short:'护盾 5',
+           desc:'本回合抵挡 5 点受到的伤害，转化为 5 点护盾（自身回合开始时清空）。'},
+  heal:   {no:'③', name:'回血',     type:'回复', color:'#4fbf5a', icon:'heart',  gemL:{k:'hp',v:4},
+           tip:'回复 4 点血量', short:'治疗 4',
+           desc:'自身恢复 4 点血量，血量不可超过上限 30。'},
+  pierce: {no:'④', name:'破甲药剂', type:'道具', color:'#c9a227', icon:'flask',  gemL:{k:'dr',v:6},
+           tip:'无视护盾 6 点伤害', short:'无视护盾伤害 6',
+           desc:'无视敌方本回合的护盾，直接造成 6 点伤害。'},
+  drain:  {no:'⑤', name:'能量汲取', type:'道具', color:'#8f5fd0', icon:'orb',    gemL:{k:'atk',v:3}, gemR:{k:'hp',v:3},
+           tip:'伤害 3 · 回血 3', short:'伤害 3 / 治疗 3',
+           desc:'造成 3 点伤害，同时自身回复 3 点血量。'},
+  poison: {no:'⑥', name:'毒药瓶',   type:'道具', color:'#6fc45a', icon:'poison', gemL:{k:'dr',v:2}, gemR:{k:'dr',v:3},
+           tip:'毒伤 2 × 3 回合', short:'毒 2 × 3 回合',
+           desc:'给敌方施加持续毒伤：3 回合内，每回合开始时扣除 2 点血量（无视护盾）。'},
+  buff:   {no:'⑦', name:'护盾强化', type:'道具', color:'#3f8fd0', icon:'wall',   gemL:{k:'sh',v:6},
+           tip:'护盾 +6', short:'护盾 6',
+           desc:'本回合自身护盾增加 6 点（自身回合开始时清空）。'},
+  bolt:   {no:'⑧', name:'闪电冲击', type:'道具', color:'#e0b423', icon:'bolt',   gemL:{k:'atk',v:4}, gemR:{k:'sh',v:0},
+           tip:'伤害 4 · 破盾', short:'伤害 4 + 破盾',
+           desc:'造成 4 点伤害，并且清空敌方当前护盾。'},
+  sac:    {no:'⑨', name:'生命献祭', type:'道具', color:'#d05fb0', icon:'skull',  gemL:{k:'atk',v:9}, gemR:{k:'hp',v:-3},
+           tip:'自损 3 · 伤害 9', short:'伤害 9 / 自损 3',
+           desc:'自身扣除 3 点血量，对敌方造成 9 点伤害（可被护盾抵挡）。'},
+  bag:    {no:'⑩', name:'补给袋',   type:'道具', color:'#a8862a', icon:'bag',    gemL:{k:'hp',v:2},
+           tip:'摸 2 张（上限 4）', short:'摸牌 2',
+           desc:'消耗此卡，从自己牌库摸取 2 张卡牌；摸牌后手牌不能超过上限 4 张，超出部分直接舍弃。'}
+};
+/* 牌库配方：共 19 张，出现概率 = 该卡数量 / 19（介绍面板自动统计，不会写错） */
+const DECK_RECIPE = ['atk','atk','atk','def','def','heal','heal','poison','poison',
+  'pierce','drain','buff','bolt','sac','bag','atk','def','heal','pierce'];
+const CARD_ORDER = ['atk','def','heal','pierce','drain','poison','buff','bolt','sac','bag'];
+function cardProb(key){
+  const n = DECK_RECIPE.filter(k=>k===key).length;
+  return {n:n, total:DECK_RECIPE.length, p:n/DECK_RECIPE.length};
+}
+/* ==================== 像素素材 ==================== */
+const SPR = {
+  hero:['....KKKK....','...KHHHHK...','..KHHHHHHK..','..KSSSSSSK..','..KSKSSKSK..',
+        '..KSSSSSSK..','...KBBBBK...','..KBBBBBBK..','..KBBBBBBK..','..KBBBBBBK..',
+        '..KBBBBBBK..','..KBB..BBK..','..KKK..KKK..','..KKK..KKK..'],
+  foe: ['.K........K.','.KK......KK.','..KRRRRRRK..','.KRRRRRRRRK.','.KRKRRRRKRK.',
+        '.KRRRRRRRRK.','..KRRRRRRK..','..KPPPPPPK..','.KPPPPPPPPK.','.KPPPPPPPPK.',
+        '.KPPPPPPPPK.','.KPP....PPK.','..KKK..KKK..','..KKK..KKK..']
+};
+const PAL = {
+  hero:{K:'#1a1206',H:'#e0b423',S:'#ffcf9e',B:'#3f8fd0'},
+  foe: {K:'#1a1206',R:'#e0453f',P:'#7a3fb0'}
+};
+/* ==================== 工具 ==================== */
+const $ = s => document.querySelector(s);
+const rnd = n => Math.floor(Math.random()*n);
+const clamp = (v,a,b) => v<a?a:(v>b?b:v);
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;}
+function mkCard(key){return {key, uid:Math.random().toString(36).slice(2,9)};}
+function mkDeck(){return shuffle(DECK_RECIPE.map(mkCard));}
+/* ==================== 状态 ==================== */
+const S = {mode:'ai', turn:0, over:false, busy:true, rounds:0};
+function mkPlayer(name,isAI,sp){
+  return {name,isAI,sp,hp:MAXHP,maxHp:MAXHP,shield:0,poison:0,deck:[],hand:[],discard:[],
+    lunge:0,shake:0,flash:0,dead:false};
+}
+let P = [];
+function other(i){return 1-i;}
+let lastPlayed = [null,null];          // 双方最近打出的牌（棋盘上的战利品展示）
+
+function newGame(mode){
+  S.mode = mode; S.turn = 0; S.over = false; S.busy = true; S.rounds = 0;
+  lastPlayed = [null,null];
+  P = [ mkPlayer('勇士', false, 'hero'), mkPlayer(mode==='ai'?'暗影术士':'玩家 2', mode==='ai', 'foe') ];
+  const lg = $('#log'); lg.innerHTML = '';
+  for(const p of P){
+    p.deck = mkDeck();
+    const six = p.deck.splice(0,6);
+    p.hand = six.slice(0,HAND_MAX);
+    p.deck.push(...six.slice(HAND_MAX));   // 超出手牌上限的自动回到牌库
+  }
+  log('sys','=== 对战开始：' + (mode==='ai'?'AI 人机对战':'本地双人对战') + ' ===');
+  log('sys','双方血量 30，各发 6 张（4 张手牌 + 2 张回牌库），每回合开始自动抽 1 张。');
+  startTurn(0);
+}
+
+/* ==================== 战斗记录：固定行数，新的顶掉旧的 ==================== */
+function logCapacity(){
+  const h = $('#log').clientHeight || 400;
+  return Math.max(7, Math.floor((h - 8) / 20));
+}
+function log(cls,msg){
+  const el = $('#log');
+  for(const n of el.childNodes) if(n.className) n.className = n.className.replace(' new','');
+  const d = document.createElement('div');
+  d.className = 'ln l-' + cls + ' new';
+  d.textContent = msg;
+  el.appendChild(d);
+  const cap = logCapacity();
+  while(el.childNodes.length > cap) el.removeChild(el.firstChild);   // 覆盖最旧的一条
+}
+function pname(i){return P[i].name;}
+function pcls(i){return i===0?'p1':'p2';}
+
+/* ==================== 抽牌 / 弃牌 ==================== */
+function drawCards(i,n,silent){
+  const p = P[i]; let got = 0;
+  for(let k=0;k<n;k++){
+    if(p.deck.length===0){
+      if(p.discard.length===0) break;
+      p.deck = shuffle(p.discard.splice(0));
+      log('sys', pname(i)+' 牌库已空，弃牌堆洗回牌库。');
+    }
+    const c = p.deck.shift();
+    if(p.hand.length >= HAND_MAX){
+      log('bad', pname(i)+' 手牌已满 4 张，抽到的【'+CARDS[c.key].name+'】直接舍弃。');
+      p.discard.push(c);
+    } else { p.hand.push(c); got++; }
+  }
+  if(!silent && got>0) log(pcls(i), pname(i)+' 抽了 '+got+' 张卡。');
+  return got;
+}
+function pushDiscard(i,c){P[i].discard.push(c);}
+
+/* ==================== 界面刷新（DOM 部分） ==================== */
+function updHUD(){
+  // 敌方手牌：牌背数量
+  const fh = $('#foeHand'); const foe = P[1];
+  if(fh.childNodes.length !== foe.hand.length){
+    fh.innerHTML = '';
+    for(let k=0;k<foe.hand.length;k++){
+      const b = document.createElement('div');
+      b.className = 'back';
+      const rot = (k - (foe.hand.length-1)/2) * 6;
+      b.style.transform = 'rotate('+rot+'deg) translateY('+(Math.abs(k-(foe.hand.length-1)/2)*3)+'px)';
+      fh.appendChild(b);
+    }
+  }
+  // 回合标识
+  $('#roundTag').textContent = S.over ? '战斗结束' : ('第 '+Math.max(1,S.rounds)+' 回合 · '+P[S.turn].name);
+  // 结束回合按钮
+  const btn = $('#endBtn'), tx = $('#endTxt');
+  const myTurn = !S.over && !S.busy && !P[S.turn].isAI;
+  btn.classList.toggle('dis', !myTurn);
+  tx.innerHTML = S.over ? '战斗<br>结束' : (myTurn ? '结束<br>回合' : '对手<br>回合');
+  return myTurn;
+}
+
+/* ==================== 像素图标（可绘制到任意画布） ==================== */
+function drawIconTo(c2,key,s,ox,oy){
+  const col = CARDS[key].color, K = '#0a0704';
+  const R = (x,y,w,h,c)=>{c2.fillStyle=c;c2.fillRect(ox+x*s,oy+y*s,w*s,h*s);};
+  const put = (arr,c)=>{for(let y=0;y<8;y++)for(let x=0;x<8;x++)if(arr[y][x]==='1')R(x,y,1,1,c);};
+  switch(CARDS[key].icon){
+    case 'sword':
+      put(['...11...','...11...','...11...','...11...','.111111.','...11...','...11...','...K1...'],'#e8e6ff');
+      R(3,1,2,5,col); R(2,6,4,1,K); R(2,7,4,1,'#8a6a3a'); break;
+    case 'shield':
+      put(['.111111.','11111111','11111111','11111111','.111111.','..1111..','...11...','........'],col);
+      R(3,2,2,3,'#fff'); break;
+    case 'heart':
+      put(['.11..11.','11111111','11111111','11111111','.111111.','..1111..','...11...','........'],col);
+      R(2,1,2,2,'#ffd0d8'); break;
+    case 'flask':
+      put(['...11...','...11...','..1111..','..1111..','.111111.','11111111','11111111','.111111.'],'#cfd8ff');
+      R(3,4,2,4,col); R(2,6,4,2,col); break;
+    case 'orb':
+      put(['..1111..','.111111.','11111111','11111111','11111111','11111111','.111111.','..1111..'],col);
+      R(2,2,2,2,'#fff'); R(5,5,1,1,'#fff'); break;
+    case 'poison':
+      put(['......1.','...111..','..11111.','..11111.','..11111.','..11K11.','..11111.','...111..'],'#6fbf5a');
+      R(3,4,2,1,K); R(2,5,1,1,K); R(5,5,1,1,K); break;
+    case 'wall':
+      put(['11111111','1.11.11.','11111111','1.11.11.','11111111','1.11.11.','11111111','........'],col);
+      R(0,0,8,1,'#dff2ff'); break;
+    case 'bolt':
+      put(['.....11.','....11..','...11...','..11111.','....11..','...11...','..11....','.11.....'],'#ffe066');
+      R(3,2,2,3,'#fff8c0'); break;
+    case 'skull':
+      put(['.111111.','11111111','1K1K1K1K','11111111','.111111.','..1111..','..1.1.1.','..1.1.1.'],col);
+      R(2,2,1,2,K); R(5,2,1,2,K); break;
+    case 'bag':
+      put(['...11...','..1..1..','.111111.','11111111','11111111','111111K1','11111111','.111111.'],col);
+      R(4,4,2,2,'#fff3b0'); break;
+    default:
+      R(1,1,6,6,col);
+  }
+}
+function drawIcon(cvEl,key,scale){
+  cvEl.width = 8*scale; cvEl.height = 8*scale;
+  const c2 = cvEl.getContext('2d');
+  c2.imageSmoothingEnabled = false;
+  drawIconTo(c2, key, scale, 0, 0);
+}
+/* ==================== 棋盘布局 ==================== */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const W = cv.width, H = cv.height;
+const HERO = [
+  {px:70, py:302, bandTop:254, nameY:252, rowBottom:338, zoneY:266},   // 0 = 我方（下方）
+  {px:70, py:86,  bandTop:40,  nameY:36,  rowBottom:172, zoneY:100}    // 1 = 对手（上方）
+];
+const ZONE_X = 326, ZONE_W = 264, SLOT = 60;
+const FX = {text:[], part:[], slash:[], ring:[], bolt:[], token:[]};
+function heroX(i){return 280;}          // 精灵水平中心
+function heroTop(i){return HERO[i].rowBottom - 5*SPR[P[i].sp].length;}
+
+/* ==================== 棋盘绘制 ==================== */
+function drawBoard(t){
+  // 底色：石板 + 木质桌面
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#3b4657'); g.addColorStop(.5,'#2b3340'); g.addColorStop(1,'#3b4657');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  // 石板格
+  for(let y=0;y<H;y+=50){
+    for(let x=0;x<W;x+=50){
+      const on = ((x/50)+(y/50))%2===0;
+      ctx.fillStyle = on ? 'rgba(255,255,255,.028)' : 'rgba(0,0,0,.07)';
+      ctx.fillRect(x,y,50,50);
+    }
+  }
+  // 中央分隔带 + 金线
+  ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(0,196,W,80);
+  ctx.fillStyle = '#6b5220'; ctx.fillRect(0,208,W,4);
+  ctx.fillStyle = '#d8b968'; ctx.fillRect(0,209,W,2);
+  ctx.fillStyle = '#6b5220'; ctx.fillRect(0,252,W,4);
+  ctx.fillStyle = '#d8b968'; ctx.fillRect(0,253,W,2);
+  // 中央菱形装饰
+  const cx = W/2, cy = 231;
+  ctx.fillStyle = '#d8b968';
+  ctx.beginPath(); ctx.moveTo(cx,cy-16); ctx.lineTo(cx+22,cy); ctx.lineTo(cx,cy+16);
+  ctx.lineTo(cx-22,cy); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2b3340';
+  ctx.beginPath(); ctx.moveTo(cx,cy-9); ctx.lineTo(cx+12,cy); ctx.lineTo(cx,cy+9);
+  ctx.lineTo(cx-12,cy); ctx.closePath(); ctx.fill();
+  // 两侧装饰锚点
+  for(const ax of [90, W-90]){
+    ctx.fillStyle = '#6b5220'; ctx.fillRect(ax-3, 216, 6, 30);
+    ctx.fillStyle = '#d8b968'; ctx.fillRect(ax-3, 216, 6, 4); ctx.fillRect(ax-3, 242, 6, 4);
+  }
+  // 浮动光尘
+  for(let i=0;i<26;i++){
+    const px = (i*173 + t/40*(1+(i%3))) % W;
+    const py = (i*97 + Math.sin(t/900+i)*30) % H;
+    ctx.globalAlpha = .22 + .18*Math.sin(t/500+i);
+    ctx.fillStyle = '#f3e0a3'; ctx.fillRect(Math.round(px), Math.round(py), 2, 2);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawZone(i){
+  const band = HERO[i];
+  ctx.save();
+  ctx.strokeStyle = 'rgba(216,185,104,.28)'; ctx.lineWidth = 2;
+  ctx.setLineDash([6,6]);
+  ctx.strokeRect(ZONE_X, band.zoneY, ZONE_W, band.rowBottom-band.zoneY);
+  ctx.restore();
+  ctx.fillStyle = 'rgba(216,185,104,.20)';
+  ctx.font = '11px "Courier New",monospace'; ctx.textAlign = 'center';
+  ctx.fillText('出牌区', ZONE_X+ZONE_W/2, band.zoneY + (band.rowBottom-band.zoneY)/2 + 4);
+  ctx.textAlign = 'left';
+}
+function drawPortrait(i,t){
+  const p = P[i], band = HERO[i];
+  const px = band.px, py = band.py, r = 36;
+  // 外圈金环
+  ctx.beginPath(); ctx.arc(px,py,r+6,0,6.2832);
+  ctx.fillStyle = '#6b5220'; ctx.fill();
+  ctx.beginPath(); ctx.arc(px,py,r+3,0,6.2832);
+  ctx.fillStyle = '#d8b968'; ctx.fill();
+  ctx.beginPath(); ctx.arc(px,py,r,0,6.2832);
+  const rg = ctx.createRadialGradient(px,py-14,4,px,py,r);
+  rg.addColorStop(0, p.dead ? '#3a3a44' : '#4a5a78'); rg.addColorStop(1,'#151a24');
+  ctx.fillStyle = rg; ctx.fill();
+  // 受击/中毒染色
+  if(p.poison>0){ ctx.beginPath(); ctx.arc(px,py,r,0,6.2832);
+    ctx.fillStyle = 'rgba(111,196,90,.28)'; ctx.fill(); }
+  if(p.flash>0){ ctx.beginPath(); ctx.arc(px,py,r,0,6.2832);
+    ctx.fillStyle = 'rgba(255,90,80,'+(0.5*p.flash)+')'; ctx.fill(); }
+  // 头像像素半身像（裁剪在圆内）
+  ctx.save();
+  ctx.beginPath(); ctx.arc(px,py,r-1,0,6.2832); ctx.clip();
+  const m = SPR[p.sp], pal = PAL[p.sp], s = 5;
+  const bw = 12*s, bh = 7*s;
+  const ox = Math.round(px - bw/2), oy = Math.round(py - bh/2 + 8);
+  for(let y=0;y<7;y++) for(let x=0;x<12;x++){
+    const ch = m[y][x]; if(ch==='.') continue;
+    ctx.fillStyle = (p.flash>0 && ch!=='K') ? '#fff' : (pal[ch]||'#fff');
+    ctx.fillRect(ox + x*s, oy + y*s, s, s);
+  }
+  ctx.restore();
+  // 死亡叉
+  if(p.dead){
+    ctx.strokeStyle = '#e0453f'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(px-24,py-24); ctx.lineTo(px+24,py+24);
+    ctx.moveTo(px+24,py-24); ctx.lineTo(px-24,py+24); ctx.stroke();
+  }
+  // 名字（行动方两侧加金色菱形标记）
+  ctx.font = 'bold 15px Georgia,serif'; ctx.textAlign = 'center';
+  const active = (S.turn===i && !S.over);
+  ctx.fillStyle = active ? '#f3e0a3' : '#c9c1a6';
+  ctx.fillText(p.name, px, band.nameY);
+  if(active){
+    const nw = ctx.measureText(p.name).width;
+    ctx.fillStyle = '#d8b968';
+    ctx.fillText('\u25C6', px - nw/2 - 13, band.nameY);
+    ctx.fillText('\u25C6', px + nw/2 + 13, band.nameY);
+    // 行动方外圈脉动光环
+    const pulse = 0.5 + 0.5*Math.sin(Date.now()/260);
+    ctx.globalAlpha = 0.35 + 0.45*pulse;
+    ctx.strokeStyle = '#f3e0a3'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(px, py, r + 11 + pulse*3, 0, 6.2832); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.textAlign = 'left';
+}
+function gem(cx,cy,r,c1,c2,txt,ring){
+  ctx.beginPath(); ctx.arc(cx,cy,r+3,0,6.2832); ctx.fillStyle = '#1a1206'; ctx.fill();
+  const rg = ctx.createRadialGradient(cx-r*0.35, cy-r*0.4, 1, cx, cy, r);
+  rg.addColorStop(0,c1); rg.addColorStop(1,c2);
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,6.2832); ctx.fillStyle = rg; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = ring || '#d8b968'; ctx.beginPath();
+  ctx.arc(cx,cy,r,0,6.2832); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = 'bold '+(r>13?17:14)+'px Georgia,serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(txt, cx, cy+1);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+}
+function drawStats(i){
+  const p = P[i], band = HERO[i], px = band.px, py = band.py;
+  // 血量宝石（红）
+  gem(px+33, py+29, 17, '#ff9a86', '#b3261c', String(Math.max(0,p.hp)));
+  // 护盾宝石（蓝）
+  if(p.shield>0) gem(px-33, py+31, 14, '#9fd8ff', '#20567f', String(p.shield), '#7fc4ee');
+  // 中毒徽标
+  if(p.poison>0){
+    gem(px+30, py-30, 13, '#a8f0a0', '#2f7a35', String(p.poison), '#7fc45a');
+    ctx.fillStyle = 'rgba(111,196,90,.75)';
+    for(let k=0;k<3;k++){
+      const f = (Date.now()/700 + k*0.33) % 1;
+      ctx.fillRect(px+26+k*5, py-52-8*f, 3, 3);
+    }
+  }
+  // 牌库小牌堆（三层错位，像一叠牌）
+  const dx = 128, dy = py + 4;
+  for(let s=2;s>=0;s--){
+    const ox = dx + s*3, oy = dy - s*2;
+    ctx.fillStyle = '#1a1206'; ctx.fillRect(ox-1, oy-1, 21, 30);
+    ctx.fillStyle = s===0 ? '#2f3a58' : '#28324c'; ctx.fillRect(ox, oy, 19, 28);
+    ctx.fillStyle = '#8a6a2f';
+    ctx.fillRect(ox, oy, 19, 2); ctx.fillRect(ox, oy+26, 19, 2);
+    ctx.fillRect(ox, oy, 2, 28); ctx.fillRect(ox+17, oy, 2, 28);
+  }
+  ctx.font = '10px "Courier New",monospace'; ctx.fillStyle = '#a9a08a';
+  ctx.fillText('牌库 '+p.deck.length, dx+34, dy+13);
+  ctx.fillText('弃牌 '+p.discard.length, dx+34, dy+27);
+}
+function drawSpriteAt(i,ox,oy){
+  const p = P[i], m = SPR[p.sp], pal = PAL[p.sp], s = 5;
+  const bx = Math.round(heroX(i) - 6*s + ox), by = Math.round(heroTop(i) + oy);
+  ctx.fillStyle = 'rgba(0,0,0,.4)';
+  ctx.fillRect(bx-6, by+m.length*s, m[0].length*s+12, 6);
+  for(let y=0;y<m.length;y++) for(let x=0;x<m[y].length;x++){
+    const ch = m[y][x]; if(ch==='.') continue;
+    ctx.fillStyle = (p.flash>0 && ch!=='K') ? '#fff' : (pal[ch]||'#fff');
+    const sx = i===1 ? (m[y].length-1-x) : x;
+    ctx.fillRect(bx + sx*s, by + y*s, s, s);
+  }
+}
+function drawTokens(i){
+  const band = HERO[i];
+  let k = 0;
+  for(const tk of FX.token){
+    if(tk.side!==i) continue;
+    const f = tk.t/tk.dur;
+    if(f>=1) continue;
+    const x = ZONE_X + 12 + k*(SLOT+6), y = band.zoneY + (band.rowBottom-band.zoneY)/2 - 34;
+    const a = f<0.12 ? f/0.12 : (f>0.82 ? (1-f)/0.18 : 1);
+    ctx.globalAlpha = a;
+    const sc = 1 + (f<0.12 ? (1-f/0.12)*0.3 : 0);
+    const w = 44*sc, h = 62*sc;
+    ctx.fillStyle = '#1a1206'; ctx.fillRect(x-2, y-2, w+4, h+4);
+    ctx.fillStyle = '#39445c'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = CARDS[tk.key].color; ctx.fillRect(x, y, w, 3);
+    drawIconTo(ctx, tk.key, 5, x+2, y+7);
+    ctx.fillStyle = 'rgba(0,0,0,.85)';
+    ctx.fillRect(x+2, y+h-16, w-4, 13);
+    ctx.fillStyle = '#f3e0a3'; ctx.font = '9px Georgia,serif'; ctx.textAlign = 'center';
+    ctx.fillText(CARDS[tk.key].name, x+w/2, y+h-6);
+    ctx.textAlign = 'left';
+    ctx.globalAlpha = 1;
+    k++;
+  }
+}
+/* ==================== 特效与主循环 ==================== */
+function fxText(i,txt,color,size,dx){
+  FX.text.push({x:heroX(i)+(dx||0), y:heroTop(i)-14, txt, color:color||'#fff',
+    size:size||24, t:0, dur:1000});
+}
+function fxBurst(i,color,n,pw){
+  const p = P[i], r = HERO[i];
+  const bx = p.lunge>0 ? r.px : heroX(i), by = heroTop(i) + 20;
+  for(let k=0;k<(n||14);k++){
+    FX.part.push({x:bx+(Math.random()*40-20), y:by+(Math.random()*40-20),
+      vx:(Math.random()*2-1)*(pw||90), vy:(Math.random()*2-1)*(pw||90)-30,
+      s:3+rnd(3)*2, color, t:0, dur:600+rnd(400)});
+  }
+}
+function fxSlash(i,color){
+  const o = other(i);
+  FX.slash.push({x:heroX(o), y:heroTop(o)+30, color:color||'#fff', t:0, dur:460});
+}
+function fxRing(i,color){
+  FX.ring.push({x:heroX(i), y:heroTop(i)+34, color:color||'#7fc4ee', t:0, dur:600});
+}
+function fxBolt(i,color){
+  const dir = i===0 ? -1 : 1, o = other(i);
+  FX.bolt.push({x0:heroX(i)+dir*180, y0:HORow(i), x1:heroX(o), y1:heroTop(o)+30,
+    color:color||'#ffe066', t:0, dur:420});
+}
+function HORow(i){return HERO[i].rowBottom;}
+function fxToken(i,key){FX.token.push({side:i, key, t:0, dur:2600});}
+function drawFX(t){
+  for(let k=FX.slash.length-1;k>=0;k--){
+    const s = FX.slash[k], f = s.t/s.dur;
+    if(f>=1){ FX.slash.splice(k,1); continue; }
+    ctx.globalAlpha = 1-f*0.85;
+    ctx.strokeStyle = s.color; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 34+f*58, -1.0+f*0.7, 0.7+f*0.7); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 40+f*58, -0.8+f*0.7, 0.5+f*0.7); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  for(let k=FX.bolt.length-1;k>=0;k--){
+    const b = FX.bolt[k], f = b.t/b.dur;
+    if(f>=1){ FX.bolt.splice(k,1); continue; }
+    ctx.globalAlpha = 1-f*0.7;
+    ctx.strokeStyle = '#fff8c0'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(b.x0,b.y0);
+    const seg = 8;
+    for(let s2=1;s2<=seg;s2++){
+      const t2 = s2/seg;
+      const jx = (s2<seg)? (rnd(3)-1)*16 : 0, jy = (s2<seg)? (rnd(3)-1)*20 : 0;
+      ctx.lineTo(b.x0+(b.x1-b.x0)*t2+jx, b.y0+(b.y1-b.y0)*t2+jy);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = b.color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  for(let k=FX.ring.length-1;k>=0;k--){
+    const r2 = FX.ring[k], f = r2.t/r2.dur;
+    if(f>=1){ FX.ring.splice(k,1); continue; }
+    ctx.globalAlpha = 1-f;
+    ctx.strokeStyle = r2.color; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(r2.x, r2.y, 16+f*78, 0, 6.2832); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  for(let k=FX.part.length-1;k>=0;k--){
+    const q = FX.part[k], f = q.t/q.dur;
+    if(f>=1){ FX.part.splice(k,1); continue; }
+    ctx.globalAlpha = 1-f;
+    ctx.fillStyle = q.color;
+    ctx.fillRect(Math.round(q.x + q.vx*q.t), Math.round(q.y + q.vy*q.t + 0.0012*q.t*q.t), q.s, q.s);
+    ctx.globalAlpha = 1;
+  }
+  for(let k=FX.text.length-1;k>=0;k--){
+    const f2 = FX.text[k], f = f2.t/f2.dur;
+    if(f>=1){ FX.text.splice(k,1); continue; }
+    ctx.globalAlpha = 1-f*f;
+    ctx.font = 'bold '+f2.size+'px Georgia,serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#1a1206'; ctx.fillText(f2.txt, f2.x+2, f2.y - f*52 + 2);
+    ctx.fillStyle = f2.color; ctx.fillText(f2.txt, f2.x, f2.y - f*52);
+    ctx.globalAlpha = 1;
+  }
+  ctx.textAlign = 'left';
+}
+function render(t){
+  drawBoard(t);
+  drawZone(0); drawZone(1);
+  for(let i=0;i<2;i++) drawPortrait(i,t);
+  for(let i=0;i<2;i++) drawStats(i);
+  for(let i=0;i<2;i++){
+    const p = P[i], dir = i===0?1:-1;
+    let ox = 0, oy = 0;
+    if(p.lunge>0) ox = dir*(1-Math.abs(p.lunge*2-1))*30;
+    if(p.shake>0){ ox += (Math.random()*2-1)*12*p.shake; oy += (Math.random()*2-1)*8*p.shake; }
+    ctx.globalAlpha = p.dead ? 0.45 : 1;
+    drawSpriteAt(i, ox, oy);
+    ctx.globalAlpha = 1;
+  }
+  drawTokens(0); drawTokens(1);
+  drawFX(t);
+  if(S.over){ ctx.fillStyle = 'rgba(6,7,12,.5)'; ctx.fillRect(0,0,W,H); }
+}
+let lastT = 0;
+function loop(ts){
+  const dt = Math.min(48, ts - lastT || 16); lastT = ts;
+  for(const a of FX.text) a.t += dt;
+  for(const a of FX.part) a.t += dt;
+  for(const a of FX.slash) a.t += dt;
+  for(const a of FX.ring) a.t += dt;
+  for(const a of FX.bolt) a.t += dt;
+  for(let k=FX.token.length-1;k>=0;k--){ FX.token[k].t += dt; if(FX.token[k].t>FX.token[k].dur) FX.token.splice(k,1); }
+  for(const p of P){
+    if(!p) continue;
+    p.shake = Math.max(0, p.shake - dt/240);
+    p.flash = Math.max(0, p.flash - dt/170);
+    p.lunge = Math.max(0, p.lunge - dt/300);
+  }
+  render(ts);
+  requestAnimationFrame(loop);
+}
+function toast(txt){
+  const el = $('#toast');
+  el.textContent = txt;
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+}
+/* ==================== 伤害 / 回复 ==================== */
+function dealDamage(src,tgt,amount,opts){
+  opts = opts||{};
+  const T = P[tgt]; let dmg = amount;
+  if(!opts.pierce && T.shield>0){
+    const absorbed = Math.min(T.shield, dmg);
+    T.shield -= absorbed; dmg -= absorbed;
+    if(absorbed>0){
+      fxText(tgt, '-'+absorbed+' 盾', '#9fd8ff', 20, -46);
+      fxBurst(tgt,'#9fd8ff',10,60);
+      log('sys', T.name+' 的护盾抵挡 '+absorbed+' 点伤害'+(T.shield>0?'（剩余护盾 '+T.shield+'）':'（护盾破碎）'));
+    }
+  }
+  if(dmg>0){
+    T.hp -= dmg; T.shake = 1; T.flash = 1;
+    fxText(tgt, '-'+dmg, '#ff8a80', 32);
+    fxBurst(tgt,'#e0453f',22,130);
+    log('bad', T.name+' 受到 '+dmg+' 点伤害（HP '+Math.max(0,T.hp)+'）');
+  }
+  return dmg;
+}
+function healPlayer(i,amount){
+  const p = P[i], before = p.hp;
+  p.hp = Math.min(p.maxHp, p.hp + amount);
+  const got = p.hp - before;
+  if(got>0){
+    fxText(i, '+'+got, '#7fe08a', 30);
+    fxBurst(i,'#4fbf5a',18,80);
+    fxRing(i,'#7fe08a');
+    log('good', p.name+' 回复 '+got+' 点血量（HP '+p.hp+'/30）');
+  } else {
+    fxText(i, '已满', '#a9a08a', 18);
+    log('sys', p.name+' 血量已满，回复无效。');
+  }
+  return got;
+}
+function selfLose(i,amount){
+  const p = P[i];
+  p.hp -= amount; p.flash = 1;
+  fxText(i, '-'+amount, '#e6a8d8', 26);
+  fxBurst(i,'#d05fb0',14,90);
+  log('bad', p.name+' 以生命为代价，自损 '+amount+' 点血量（HP '+Math.max(0,p.hp)+'）');
+}
+/* ==================== 卡牌结算 ==================== */
+function resolveCard(i,ci){
+  const p = P[i], e = other(i), T = P[e];
+  const c = p.hand[ci], key = c.key, d = CARDS[key];
+  p.hand.splice(ci,1);
+  pushDiscard(i,c);
+  p.lunge = 1;
+  lastPlayed[i] = key;
+  fxToken(i,key);
+  switch(key){
+    case 'atk':
+      fxSlash(i,'#e0453f'); dealDamage(i,e,6); break;
+    case 'def':
+      p.shield += 5; fxRing(i,'#7fc4ee'); fxText(i,'+5 护盾','#9fd8ff',26,-46);
+      fxBurst(i,'#3f8fd0',14,70);
+      log('good', p.name+' 获得 5 点护盾（当前护盾 '+p.shield+'）'); break;
+    case 'heal':
+      healPlayer(i,4); break;
+    case 'pierce':
+      fxBurst(e,'#d8b968',24,140);
+      fxText(e,'无视护盾！','#f3e0a3',20,0);
+      log('sys','破甲药剂无视了 '+T.name+' 的护盾。');
+      dealDamage(i,e,6,{pierce:true}); break;
+    case 'drain':
+      fxBurst(e,'#8f5fd0',20,120);
+      dealDamage(i,e,3); healPlayer(i,3); break;
+    case 'poison':
+      T.poison = POISON_TURNS;
+      fxBurst(e,'#6fc45a',26,110);
+      fxText(e,'中毒！','#9bee77',24);
+      log('poi', T.name+' 中毒了：接下来 '+POISON_TURNS+' 回合，每回合开始扣 '+POISON_DMG+' 点血量（无视护盾）。'); break;
+    case 'buff':
+      p.shield += 6; fxRing(i,'#7fc4ee'); fxText(i,'+6 护盾','#9fd8ff',26,-46);
+      fxBurst(i,'#3f8fd0',18,80);
+      log('good', p.name+' 护盾强化 +6（当前护盾 '+p.shield+'）'); break;
+    case 'bolt':
+      fxBolt(i,'#ffe066');
+      if(T.shield>0) log('sys','闪电冲击清空了 '+T.name+' 的 '+T.shield+' 点护盾！');
+      T.shield = 0; T.flash = 1;
+      fxBurst(e,'#e0b423',26,150);
+      dealDamage(i,e,4,{pierce:true}); break;
+    case 'sac':
+      selfLose(i,3); fxSlash(i,'#d05fb0'); dealDamage(i,e,9); break;
+    case 'bag':
+      fxRing(i,'#d8b968'); fxText(i,'摸牌！','#f3e0a3',24,-46);
+      log('sys', p.name+' 使用补给袋，从牌库摸 2 张（手牌上限 4）。');
+      drawCards(i,2); break;
+  }
+  updHUD();
+}
+/* ==================== 胜负判定 ==================== */
+function checkEnd(){
+  if(S.over) return true;
+  const dead = [];
+  for(let i=0;i<2;i++) if(P[i].hp <= 0) dead.push(i);
+  if(dead.length===0) return false;
+  if(dead.length===2){ endGame(-1); return true; }
+  endGame(other(dead[0]));
+  return true;
+}
+function endGame(w){
+  S.over = true; S.busy = true;
+  P.forEach(p=>{ if(p.hp<=0) p.dead = true; });
+  if(w<0){
+    $('#overTxt').innerHTML = '<span style="color:#c9c1a6;font-size:26px">同归于尽 · 平局</span>';
+    $('#overSub').innerHTML = '两位战士同时倒下了……';
+    log('sys','=== 平局！双方血量同时归零。 ===');
+  } else {
+    $('#overTxt').textContent = P[w].name + ' 获胜！';
+    $('#overSub').innerHTML = P[0].name+' 剩余血量：<b style="color:#7fe08a">'+Math.max(0,P[0].hp)+
+      '</b> ／ '+MAXHP+'<br>'+P[1].name+' 剩余血量：<b style="color:#7fe08a">'+Math.max(0,P[1].hp)+
+      '</b> ／ '+MAXHP+'<br><br>本局共进行 '+S.rounds+' 个回合 · 模式：'+
+      (S.mode==='ai'?'AI 人机对战':'本地双人对战');
+    log('sys','=== 战斗结束：'+P[w].name+' 获胜！ ===');
+  }
+  updHUD(); renderHand();
+  setTimeout(()=>$('#over').classList.remove('hidden'), 800);
+}
+/* ==================== 回合流程 ==================== */
+function startTurn(i){
+  if(S.over) return;
+  S.turn = i; S.rounds++;
+  const p = P[i];
+  log('sys','—— 第 '+S.rounds+' 回合：'+p.name+' 行动 ——');
+  toast(p.isAI ? '对手回合' : '你的回合');
+  if(p.shield>0){ log('sys', p.name+' 回合开始，护盾清空（-'+p.shield+'）。'); p.shield = 0; }
+  if(p.poison>0){
+    p.poison--;
+    p.hp -= POISON_DMG;
+    fxText(i,'-'+POISON_DMG+' 毒','#9bee77',28);
+    fxBurst(i,'#6fc45a',20,60);
+    log('poi', p.name+' 毒发：扣 '+POISON_DMG+' 点血量（无视护盾），剩余 '+p.poison+' 回合（HP '+Math.max(0,p.hp)+'）');
+    updHUD();
+    if(checkEnd()) return;
+  }
+  if(p.hand.length < HAND_MAX) drawCards(i,1);
+  else log('bad', p.name+' 手牌已满 4 张，本回合不抽牌。');
+  S.busy = false; updHUD(); renderHand();
+  if(p.isAI){ S.busy = true; updHUD(); setTimeout(()=>aiTurn(i), 950); }
+}
+function endTurn(){
+  if(S.over) return;
+  S.busy = true; updHUD(); renderHand();
+  const nxt = other(S.turn);
+  setTimeout(()=>{ if(!S.over) startTurn(nxt); }, 760);
+}
+function doPlay(i,ci){
+  if(S.over) return;
+  const c = P[i].hand[ci]; if(!c) return;
+  const d = CARDS[c.key];
+  log(pcls(i), '▶ '+P[i].name+' 打出 '+d.no+d.name+'（'+d.type+'）');
+  resolveCard(i,ci);
+  renderHand();
+  if(checkEnd()) return;
+  endTurn();
+}
+/* ==================== AI 决策 ==================== */
+function aiChoose(i){
+  const p = P[i], foe = P[other(i)];
+  const has = k => p.hand.findIndex(c=>c.key===k);
+  const first = arr => { for(const k of arr){ const x = has(k); if(x>=0) return x; } return -1; };
+  let ci = -1;
+  if(p.hp <= 10) ci = first(['heal','drain']);                              // 1 血低优先回血
+  if(ci<0 && foe.shield>0) ci = first(['pierce','bolt','atk']);             // 2 敌有盾：破甲/闪电
+  if(ci<0 && p.hand.length<=2) ci = first(['bag']);                         // 3 手牌少用补给袋
+  if(ci<0){                                                                 // 4 能斩杀则斩杀
+    const DMG = {pierce:6, sac:9, atk:6, bolt:4, drain:3};
+    for(const k of ['pierce','sac','atk','bolt','drain']){
+      const x = has(k); if(x<0) continue;
+      if(k==='sac' && p.hp<=9) continue;
+      const effHp = foe.hp + (k==='pierce' ? 0 : foe.shield);
+      if(DMG[k] >= effHp){ ci = x; break; }
+    }
+  }
+  if(ci<0 && p.hp>=15) ci = first(['sac','poison','atk','bolt','pierce','drain']);   // 5 健康：进攻
+  if(ci<0 && p.hp>=10) ci = first(['atk','poison','drain','bolt','pierce','buff','def']);
+  if(ci<0) ci = first(['def','buff','heal','poison','atk','drain','pierce','bolt','bag']);
+  if(ci>=0 && p.hand[ci].key==='sac' && p.hp<=3) ci = -1;                   // 不自损致死
+  if(ci<0) ci = p.hand.findIndex(c => !(c.key==='sac' && p.hp<=3));
+  return ci;
+}
+function aiTurn(i){
+  if(S.over || S.turn!==i) return;
+  const p = P[i];
+  if(p.hand.length===0){ log('sys', p.name+' 手上没有卡牌，跳过出牌直接结束回合。'); endTurn(); return; }
+  const ci = aiChoose(i);
+  if(ci<0){ log('sys', p.name+' 没有可以安全打出的卡牌，结束回合。'); endTurn(); return; }
+  const key = p.hand[ci].key;
+  log('sys', p.name+' 思索片刻…选择了 '+CARDS[key].no+CARDS[key].name);
+  doPlay(i,ci);
+}
+/* ==================== 手牌渲染（炉石风格） ==================== */
+function mkGem(side,g){
+  const el = document.createElement('div');
+  el.className = 'gem ' + side + ' ' + g.k;
+  el.textContent = g.v > 0 ? g.v : (g.v === 0 ? '\u2715' : g.v);
+  el.title = g.k==='atk' ? '伤害' : (g.k==='sh' ? '护盾' : (g.k==='hp' ? '治疗/血量' : '持续效果'));
+  return el;
+}
+function renderHand(){
+  const box = $('#myHand'); box.innerHTML = '';
+  const i = S.turn, p = P[i];
+  if(!p) return;
+  if(p.isAI){
+    const tip = document.createElement('div');
+    tip.style.cssText = 'font-family:Georgia,serif;font-size:13px;color:#a9a08a;'+
+      'letter-spacing:2px;padding:0 10px 110px';
+    tip.textContent = S.over ? '战斗结束' : '对手正在出牌…';
+    box.appendChild(tip);
+    return;
+  }
+  const canClick = !S.over && !S.busy;
+  p.hand.forEach((c,idx)=>{
+    const d = CARDS[c.key];
+    const el = document.createElement('div');
+    el.className = 'card' + (canClick ? '' : ' dis');
+    const art = document.createElement('div'); art.className = 'art';
+    const icon = document.createElement('canvas'); art.appendChild(icon);
+    el.appendChild(art);
+    const nm = document.createElement('div'); nm.className='nm'; nm.textContent = d.name; el.appendChild(nm);
+    const tp = document.createElement('div'); tp.className='tp'; tp.textContent = d.type + ' 卡'; el.appendChild(tp);
+    const ds = document.createElement('div'); ds.className='ds'; ds.textContent = d.tip; el.appendChild(ds);
+    if(d.gemL) el.appendChild(mkGem('l', d.gemL));
+    if(d.gemR) el.appendChild(mkGem('r', d.gemR));
+    if(canClick) el.onclick = ()=>openModal(idx);
+    box.appendChild(el);
+    drawIcon(icon, c.key, 6);
+  });
+  if(p.hand.length===0){
+    const tip = document.createElement('div');
+    tip.style.cssText = 'font-family:Georgia,serif;font-size:13px;color:#a9a08a;'+
+      'letter-spacing:2px;padding:0 10px 40px';
+    tip.textContent = '没有手牌，按【结束回合】继续';
+    box.appendChild(tip);
+  }
+}
+/* ==================== 卡牌详情弹窗 ==================== */
+let pending = null;
+function fillBig(big,key){
+  big.innerHTML = '<div class="art"></div><div class="nm"></div><div class="nm2"></div><div class="ds"></div>';
+  const d = CARDS[key];
+  drawIcon(big.querySelector('.art').appendChild(document.createElement('canvas')), key, 12);
+  big.querySelector('.nm').textContent = d.name;
+  big.querySelector('.nm2').textContent = d.type + ' 卡 · ' + d.no;
+  big.querySelector('.ds').textContent = d.tip;
+  if(d.gemL) big.appendChild(mkGem('l', d.gemL));
+  if(d.gemR) big.appendChild(mkGem('r', d.gemR));
+}
+function openModal(ci){
+  if(S.over || S.busy || P[S.turn].isAI) return;
+  const i = S.turn, c = P[i].hand[ci];
+  if(!c) return;
+  const d = CARDS[c.key], pr = cardProb(c.key);
+  pending = {pi:i, ci:ci, uid:c.uid};
+  fillBig($('#mBig'), c.key);
+  const t = $('#mType');
+  t.textContent = d.type + ' 卡 ｜ ' + d.name;
+  t.style.color = d.color; t.style.borderColor = d.color;
+  $('#mDesc').innerHTML =
+    '<b class="k">效果：</b>' + d.desc +
+    '<br><br><b class="k">牌库出现概率：</b>' + pr.n + ' / ' + pr.total +
+      ' 张，约 ' + (pr.p*100).toFixed(1) + '%' +
+    '<br><b class="k">简要：</b>' + d.tip +
+    '<br><br><span style="color:#a9a08a">确认打出后立即结算，并结束你的回合。</span>';
+  S.busy = true; updHUD();
+  $('#modal').classList.remove('hidden');
+}
+function closeModal(){ $('#modal').classList.add('hidden'); pending = null; }
+function cancelModal(){
+  if(!pending) return;
+  closeModal();
+  S.busy = false; updHUD(); renderHand();
+  log('sys','取消出牌，卡牌保留在手牌中。');
+}
+function confirmPlay(){
+  if(!pending) return;
+  const p0 = pending;
+  closeModal();
+  if(S.over || p0.pi !== S.turn){ S.busy = false; updHUD(); renderHand(); return; }
+  let idx = P[p0.pi].hand.findIndex(c=>c.uid===p0.uid);
+  if(idx<0) idx = p0.ci;
+  if(!P[p0.pi].hand[idx]){ S.busy = false; updHUD(); renderHand(); return; }
+  S.busy = true;
+  doPlay(p0.pi, idx);
+}
+/* ==================== 游戏介绍面板 ==================== */
+function buildIntro(){
+  const total = DECK_RECIPE.length;
+  const rows = CARD_ORDER.map(k=>{
+    const d = CARDS[k], pr = cardProb(k);
+    const pct = (pr.p*100).toFixed(1);
+    return '<div class="crow"><canvas data-k="'+k+'"></canvas>'+
+      '<div class="ci"><div class="cn2">'+d.no+' '+d.name+
+        '<span class="ctag">'+d.type+'</span></div>'+
+        '<div class="cd2">'+d.desc+'</div></div>'+
+      '<div class="prob"><div class="pv">'+pr.n+'/'+total+' · '+pct+'%</div>'+
+        '<div class="pb"><i style="width:'+pct+'%"></i></div></div></div>';
+  }).join('');
+  $('#introBody').innerHTML =
+    '<div class="sect"><h3>一、玩法与回合流程</h3><div class="rules">'+
+      '· 双方初始血量 <b>30</b>，回合轮流行动；任意一方血量 ≤ 0 立即分出胜负。<br>'+
+      '· 开局双方各发 <b>6 张</b>卡：<b>4 张</b>进入手牌，超出手牌上限的 <b>2 张</b>自动回到牌库。<br>'+
+      '· 每回合开始：清空自身护盾 → 结算中毒 → 自动抽 <b>1 张</b>（手牌上限 <b>4 张</b>；'+
+        '手牌已满则不抽，摸到超出的卡直接舍弃）。<br>'+
+      '· 点击手牌弹出卡牌详情，按【打出这张牌】才会结算并结束回合；按【取消】保留手牌。'+
+        '也可以直接按右侧【结束回合】放弃出牌。<br>'+
+      '· 每回合只打出一张牌，然后轮到对方行动。'+
+    '</div></div>'+
+    '<div class="sect"><h3>二、卡牌类型</h3><div class="rules">'+
+      '<b>攻击</b>：直接造成伤害。　<b>防御</b>：生成护盾抵挡伤害。<br>'+
+      '<b>回复</b>：恢复自身血量。　<b>道具</b>：破盾、中毒、摸牌等特殊效果。<br>'+
+      '护盾会抵挡后续伤害，并在<b>自己下个回合开始时清空</b>；'+
+      '破甲药剂可无视护盾、闪电冲击可清空护盾，中毒伤害无视护盾。'+
+    '</div></div>'+
+    '<div class="sect"><h3>三、卡牌效果与出现概率</h3>'+rows+'</div>'+
+    '<div class="sect"><h3>四、概率说明</h3><div class="rules">'+
+      '· 每局开始时双方各自获得一副按上述配方组成的 <b>'+total+' 张</b>牌库，并重新随机洗牌，'+
+        '所以每局的牌序都不一样，但长期出现概率稳定。<br>'+
+      '· 出现概率 = 该卡在牌库中的张数 ÷ '+total+'（上表已直接标出）。<br>'+
+      '· 牌库抽空时，弃牌堆会自动洗回牌库，因此不会出现无牌可抽的死局。'+
+    '</div></div>';
+  const bs = $('#introBody').querySelectorAll('canvas[data-k]');
+  for(const cvs of bs) drawIcon(cvs, cvs.getAttribute('data-k'), 5);
+}
+/* ==================== 事件绑定与启动 ==================== */
+$('#btnAI').onclick = ()=>{ $('#start').classList.add('hidden'); newGame('ai'); };
+$('#btnPVP').onclick = ()=>{ $('#start').classList.add('hidden'); newGame('pvp'); };
+$('#btnIntro').onclick = ()=>$('#intro').classList.remove('hidden');
+$('#btnHelp').onclick = ()=>$('#intro').classList.remove('hidden');
+$('#introClose').onclick = ()=>$('#intro').classList.add('hidden');
+$('#btnAgain').onclick = ()=>{ $('#over').classList.add('hidden'); $('#start').classList.remove('hidden'); };
+$('#btnOverHelp').onclick = ()=>{ $('#over').classList.add('hidden'); $('#intro').classList.remove('hidden'); };
+$('#mOk').onclick = confirmPlay;
+$('#mNo').onclick = cancelModal;
+$('#endBtn').onclick = ()=>{
+  if(S.over || S.busy || P[S.turn].isAI) return;
+  const p = P[S.turn];
+  if(p.hand.length>0) log('sys', p.name+' 放弃出牌，直接结束回合。');
+  else log('sys', p.name+' 无手牌，结束回合。');
+  endTurn();
+};
+document.addEventListener('keydown', ev=>{
+  if(ev.key==='Escape'){ if(pending) cancelModal(); else $('#intro').classList.add('hidden'); }
+  if(ev.key==='Enter' && pending) confirmPlay();
+});
+buildIntro();
+P = [mkPlayer('勇士',false,'hero'), mkPlayer('暗影术士',true,'foe')];
+updHUD(); renderHand();
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
